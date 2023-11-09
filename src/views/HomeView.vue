@@ -3,6 +3,7 @@
     <video ref="video" autoplay></video>
     <button @click="startCaptureCountdown" :disabled="isCapturing">开始捕获</button>
     <button @click="stopCapture" :disabled="!isCapturing">停止捕获</button>
+    <button @click="downloadFramesZip" v-if="frames.length > 0">下载ZIP</button>
 
     <!-- 上传进度条 -->
     <div class="progress-bar" v-if="uploadProgress > 0">
@@ -13,6 +14,7 @@
 
 <script>
 import axios from 'axios';
+import JSZip from 'jszip';
 
 export default {
   data() {
@@ -32,6 +34,46 @@ export default {
     };
   },
   methods: {
+    async downloadFramesZip() {
+    if (this.frames.length === 0) {
+      return;
+    }
+
+    const zip = new JSZip();
+
+    // 将每个帧转换为PNG图像并添加到ZIP文件中
+    for (let i = 0; i < this.frames.length; i++) {
+      const frameData = this.frames[i];
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = this.video.videoWidth;
+      canvas.height = this.video.videoHeight;
+      context.putImageData(new ImageData(new Uint8ClampedArray(frameData), canvas.width, canvas.height), 0, 0);
+      const imgDataUrl = canvas.toDataURL('image/png');
+      zip.file(`frame${i + 1}.png`, imgDataUrl.split('base64,')[1], { base64: true });
+    }
+
+    // 生成ZIP文件
+    zip.generateAsync({ type: 'blob' })
+      .then((content) => {
+        // 创建一个下载链接
+        const url = window.URL.createObjectURL(new Blob([content]));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'captured_frames.zip';
+
+        // 模拟点击下载按钮
+        a.click();
+
+        // 释放URL对象
+        window.URL.revokeObjectURL(url);
+      })
+      .catch((error) => {
+        console.error('ZIP生成失败', error);
+      });
+  },
+
+
     async startCaptureCountdown() {
       this.video = this.$refs.video;
       this.frames = [];

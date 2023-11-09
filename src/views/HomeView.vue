@@ -91,7 +91,7 @@ export default {
       }, 1000);
     },
     startVideo() {
-      navigator.mediaDevices.getUserMedia({ video: true })
+      navigator.mediaDevices.getUserMedia({ video: {facingMode: { exact: "environment" } } })
         .then((stream) => {
           this.video.srcObject = stream;
         })

@@ -101,19 +101,29 @@ export default {
     },
 
     enableFlashlight() {
-      const tracks = this.video.srcObject.getTracks();
-      if (tracks.length > 0) {
-        const capabilities = tracks[0].getCapabilities();
-        if (capabilities.torch) {
-          this.flashlightOn = true;
-          tracks[0].applyConstraints({
-            advanced: [{ torch: this.flashlightOn }]
-          });
-        } else {
-          console.warn('Torch control is not supported on this device.');
-        }
-      }
-    },
+  const tracks = this.video.srcObject.getTracks();
+  if (tracks.length > 0) {
+    const capabilities = tracks[0].getCapabilities();
+    console.log('Capabilities:', capabilities);
+
+    if (capabilities.torch) {
+      this.flashlightOn = true;
+      tracks[0].applyConstraints({
+        advanced: [{ torch: this.flashlightOn }]
+      })
+      .then(() => {
+        console.log('Torch enabled successfully');
+      })
+      .catch((error) => {
+        console.error('Error enabling torch:', error);
+        alert('无法启用闪光灯：' + error.message); // 弹出包含错误信息的提示框
+      });
+    } else {
+      console.warn('Torch control is not supported on this device.');
+    }
+  }
+},
+
 
     startCapture() {
       this.captureInterval = setInterval(this.captureFrame, this.frameDuration);

@@ -1,18 +1,12 @@
 <template>
   <div id="app">
     <h1>Flashlight App</h1>
-    <button @click="toggleFlashlight">{{ flashlightStatus }}</button>
+    <button @click="toggleFlashlight">Toggle Flashlight</button>
   </div>
 </template>
 
 <script>
 export default {
-  data() {
-    return {
-      flashlightStatus: '打开闪光灯',
-      isFlashlightOn: false,
-    };
-  },
   methods: {
     async toggleFlashlight() {
       try {
@@ -21,14 +15,13 @@ export default {
         const capabilities = track.getCapabilities();
 
         if (capabilities.torch) {
-          await track.applyConstraints({ advanced: [{ torch: this.isFlashlightOn }] });
-          this.isFlashlightOn = !this.isFlashlightOn;
-          this.flashlightStatus = this.isFlashlightOn ? '关闭闪光灯' : '打开闪光灯';
+          await track.applyConstraints({ advanced: [{ torch: true }] });
+          alert('闪光灯已打开');
         } else {
-          console.error('设备不支持闪光灯');
+          alert('设备不支持闪光灯');
         }
       } catch (error) {
-        console.error('无法访问摄像头或用户拒绝了访问权限', error);
+        alert('无法访问摄像头或用户拒绝了访问权限');
       }
     },
   },

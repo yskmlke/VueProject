@@ -4,7 +4,6 @@
     <button @click="startCaptureCountdown" :disabled="isCapturing">开始捕获</button>
     <button @click="stopCapture" :disabled="!isCapturing">停止捕获</button>
     <button @click="downloadFramesZip" v-if="frames.length > 0">下载ZIP</button>
-    <button @click="toggleFlashlight">切换闪光灯</button>
 
     <!-- 上传进度条 -->
     <div class="progress-bar" v-if="uploadProgress > 0">
@@ -29,44 +28,51 @@ export default {
       frameDuration: 1000 / 30,
       captureDuration: 10000,
       countdownDuration: 3,
-      uploadProgress: 0,
+      uploadProgress: 0, // 上传进度,
       frames_timestmap: {},
-      count: 0,
-      flashlightOn: false,
+      count:0
     };
   },
   methods: {
     async downloadFramesZip() {
-      if (this.frames.length === 0) {
-        return;
-      }
+    if (this.frames.length === 0) {
+      return;
+    }
 
-      const zip = new JSZip();
+    const zip = new JSZip();
 
-      for (let i = 0; i < this.frames.length; i++) {
-        const frameData = this.frames[i];
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = this.video.videoWidth;
-        canvas.height = this.video.videoHeight;
-        context.putImageData(new ImageData(new Uint8ClampedArray(frameData), canvas.width, canvas.height), 0, 0);
-        const imgDataUrl = canvas.toDataURL('image/png');
-        zip.file(`frame${i + 1}.png`, imgDataUrl.split('base64,')[1], { base64: true });
-      }
+    // 将每个帧转换为PNG图像并添加到ZIP文件中
+    for (let i = 0; i < this.frames.length; i++) {
+      const frameData = this.frames[i];
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = this.video.videoWidth;
+      canvas.height = this.video.videoHeight;
+      context.putImageData(new ImageData(new Uint8ClampedArray(frameData), canvas.width, canvas.height), 0, 0);
+      const imgDataUrl = canvas.toDataURL('image/png');
+      zip.file(`frame${i + 1}.png`, imgDataUrl.split('base64,')[1], { base64: true });
+    }
 
-      zip.generateAsync({ type: 'blob' })
-        .then((content) => {
-          const url = window.URL.createObjectURL(new Blob([content]));
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'captured_frames.zip';
-          a.click();
-          window.URL.revokeObjectURL(url);
-        })
-        .catch((error) => {
-          console.error('ZIP生成失败', error);
-        });
-    },
+    // 生成ZIP文件
+    zip.generateAsync({ type: 'blob' })
+      .then((content) => {
+        // 创建一个下载链接
+        const url = window.URL.createObjectURL(new Blob([content]));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'captured_frames.zip';
+
+        // 模拟点击下载按钮
+        a.click();
+
+        // 释放URL对象
+        window.URL.revokeObjectURL(url);
+      })
+      .catch((error) => {
+        console.error('ZIP生成失败', error);
+      });
+  },
+
 
     async startCaptureCountdown() {
       this.video = this.$refs.video;
@@ -74,86 +80,65 @@ export default {
       this.isCapturing = true;
       this.startVideo();
 
+      // 倒计时 3 秒后开始捕获
       this.countdownInterval = setInterval(() => {
         this.countdownDuration--;
+        console.log(this.countdownDuration);
         if (this.countdownDuration <= 0) {
           clearInterval(this.countdownInterval);
           this.startCapture();
         }
       }, 1000);
     },
-
     startVideo() {
-      navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { exact: "environment" },
-          torch: this.flashlightOn,
-        }
-      })
-      .then((stream) => {
-        this.video.srcObject = stream;
-        this.enableFlashlight();
-      })
-      .catch((error) => {
-        console.error('无法打开摄像头：', error);
-        this.isCapturing = false;
-      });
+      navigator.mediaDevices.getUserMedia({ video: {facingMode: { exact: "environment" } } })
+        .then((stream) => {
+          this.video.srcObject = stream;
+        })
+        .catch((error) => {
+          console.error('无法打开摄像头：', error);
+          this.isCapturing = false;
+        });
     },
-
-    enableFlashlight() {
-      const tracks = this.video.srcObject.getTracks();
-      if (tracks.length > 0) {
-        const capabilities = tracks[0].getCapabilities();
-        if (capabilities.torch) {
-          this.flashlightOn = true;
-          tracks[0].applyConstraints({
-            advanced: [{ torch: this.flashlightOn }]
-          });
-        } else {
-          console.warn('Torch control is not supported on this device.');
-        }
-      }
-    },
-
     startCapture() {
       this.captureInterval = setInterval(this.captureFrame, this.frameDuration);
       setTimeout(this.stopCapture, this.captureDuration);
     },
-
     stopCapture() {
       clearInterval(this.captureInterval);
       this.isCapturing = false;
       this.sendFramesToServer();
       this.video.srcObject.getTracks().forEach(track => track.stop());
-      this.countdownDuration = 3;
+      this.countdownDuration = 3
     },
-
     captureFrame() {
       const canvas = document.createElement('canvas');
       const canvasContext = canvas.getContext('2d');
       canvas.width = this.video.videoWidth;
       canvas.height = this.video.videoHeight;
+      console.log(canvas.width, canvas.height);
       canvasContext.drawImage(this.video, 0, 0, canvas.width, canvas.height);
       const frameData = canvasContext.getImageData(0, 0, this.video.videoWidth, this.video.videoHeight);
-      this.frames_timestmap[String(this.count++)] = Date.now();
+      this.frames_timestmap[String(this.count++)] = Date.now();// 保存每一帧的时间戳  
       this.frames.push(frameData.data.buffer);
     },
-
     sendFramesToServer() {
       if (this.frames.length === 0) {
         return;
       }
+      //这里还要上传时间戳
       const jsonData = JSON.stringify(this.frames_timestmap);
       axios
         .post('http://127.0.0.1:5000/upload_frames_timestmap', jsonData, {
           headers: {'Content-Type': 'application/json'},
         })
-        .then(response => {
+        .then(response =>{
           console.log("时间戳已上传");
         })
-        .catch(error => {
+        .catch(error =>{
           console.log(error.message);
-        });
+        })
+
 
       const frameBlob = new Blob(this.frames, { type: 'application/octet-stream' });
       const formData = new FormData();
@@ -163,8 +148,8 @@ export default {
         .post('http://127.0.0.1:5000/upload_frames', formData, {
           onUploadProgress: (progressEvent) => {
             this.uploadProgress = Math.round((progressEvent.loaded / progressEvent.total) * 100);
-            if (this.uploadProgress === 100) {
-              console.log("上传完毕");
+            if(this.uploadProgress == 100){
+              console.log("上传完啦");
             }
           }
         })
@@ -176,21 +161,6 @@ export default {
           console.error('上传失败', error);
           this.uploadProgress = 0; // 重置上传进度
         });
-    },
-
-    toggleFlashlight() {
-      const tracks = this.video.srcObject.getTracks();
-      if (tracks.length > 0) {
-        const capabilities = tracks[0].getCapabilities();
-        if (capabilities.torch) {
-          this.flashlightOn = !this.flashlightOn;
-          tracks[0].applyConstraints({
-            advanced: [{ torch: this.flashlightOn }]
-          });
-        } else {
-          console.warn('Torch control is not supported on this device.');
-        }
-      }
     },
   },
 };
